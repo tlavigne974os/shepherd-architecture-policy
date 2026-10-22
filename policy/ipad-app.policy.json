@@ -1,0 +1,290 @@
+{
+  "version": 1,
+  "comment": "Architecture boundary for the Baxter iPad app. App code must not acquire hardware, open network paths, write durable state or create log sinks itself; it uses the BaxterMiddlewareKernel operations. Edited only through an owner-approved policy release.",
+  "app_zones": [
+    "Frame/**/*.swift"
+  ],
+  "linked_package_zones": [
+    "Packages/BaxterVoiceEngine/Sources/BaxterVoiceEngine/**",
+    "Packages/BaxterVoiceEngine/Sources/BaxterCaptureRing/**",
+    "Packages/BaxterVoiceEngine/Sources/BaxterRealtimeCapture/**",
+    "Packages/BaxterVoiceEngine/Sources/BaxterWakeRing/**",
+    "Packages/BaxterVoicePresentation/Sources/**"
+  ],
+  "kernel_zones": [
+    "Packages/BaxterMiddlewareKernel/**"
+  ],
+  "excluded": [],
+  "protected_paths": [
+    "tools/architecture-policy/**",
+    "tools/architecture-policy.pin",
+    ".github/workflows/architecture-check.yml",
+    ".github/CODEOWNERS"
+  ],
+  "dependencies": {
+    "app_targets": [
+      "BaxterToo",
+      "BaxterTooRestricted",
+      "CaptureWitnessObservation"
+    ],
+    "allowed_app_products": [
+      "BaxterMiddlewareKernel",
+      "BaxterVoiceEngine",
+      "BaxterVoicePresentation",
+      "ChessKit"
+    ],
+    "kernel_only_products": [
+      "CocoaMQTT",
+      "OpenTelemetryApi",
+      "OpenTelemetrySdk",
+      "OpenTelemetryProtocolExporterHTTP",
+      "BaxterVoiceEngineSDK29"
+    ],
+    "route": "Add the capability to Packages/BaxterMiddlewareKernel and call the kernel operation; do not link an I/O library from the app."
+  },
+  "allowed_sites": [],
+  "rules": [
+    {
+      "id": "hardware-audio",
+      "category": "hardware",
+      "route": "Use KernelAudioIO / KernelPCMRenderer / KernelTonePlayer from BaxterMiddlewareKernel; capture only starts under a CaptureGovernor lease.",
+      "symbols": [
+        "AVAudioSession",
+        "AVAudioEngine",
+        "AVAudioPlayer",
+        "AVAudioPlayerNode",
+        "AVAudioRecorder",
+        "AVAudioSinkNode",
+        "AVAudioSourceNode",
+        "AVAudioInputNode",
+        "AVAudioOutputNode",
+        "AVAudioUnit",
+        "AVAudioApplication",
+        "AVAudioRoutingArbiter",
+        "AVSpeechSynthesizer",
+        "AVAssetWriter",
+        "AVAssetReader",
+        "AudioUnit",
+        "AudioComponent",
+        "AudioQueue",
+        "SFSpeechRecognizer",
+        "SFSpeechAudioBufferRecognitionRequest",
+        "SFSpeechURLRecognitionRequest",
+        "AVAudioFile"
+      ],
+      "call_symbols": [
+        "AudioServicesPlaySystemSound"
+      ]
+    },
+    {
+      "id": "hardware-camera-sensors",
+      "category": "hardware",
+      "route": "Camera and sensors belong to the kernel; none is implemented today.",
+      "symbols": [
+        "AVCaptureSession",
+        "AVCaptureDevice",
+        "AVCaptureDeviceInput",
+        "AVCapturePhotoOutput",
+        "AVCaptureVideoDataOutput",
+        "AVCaptureAudioDataOutput",
+        "AVCaptureMovieFileOutput",
+        "CMMotionManager",
+        "CLLocationManager",
+        "CBCentralManager",
+        "CBPeripheralManager",
+        "UIImagePickerController",
+        "PHPickerViewController",
+        "LAContext"
+      ]
+    },
+    {
+      "id": "hardware-media-playback",
+      "category": "hardware",
+      "route": "Use the kernel media player and its rendering surface.",
+      "symbols": [
+        "AVPlayer",
+        "AVPlayerItem",
+        "AVPlayerLayer",
+        "AVQueuePlayer",
+        "AVURLAsset",
+        "AVAsset",
+        "AVPlayerViewController",
+        "MPVolumeView",
+        "MPRemoteCommandCenter",
+        "MPNowPlayingInfoCenter",
+        "MPMusicPlayerController"
+      ]
+    },
+    {
+      "id": "hardware-display",
+      "category": "hardware",
+      "route": "Use KernelDisplay (brightness, idle timer).",
+      "symbols": [
+        "isIdleTimerDisabled",
+        "UIScreen"
+      ]
+    },
+    {
+      "id": "network",
+      "category": "network",
+      "route": "Use a typed kernel transport; Baxter backend destinations only.",
+      "symbols": [
+        "URLSession",
+        "URLSessionConfiguration",
+        "URLSessionWebSocketTask",
+        "URLSessionDataTask",
+        "URLSessionDownloadTask",
+        "URLSessionUploadTask",
+        "URLSessionStreamTask",
+        "NWConnection",
+        "NWListener",
+        "NWPathMonitor",
+        "NWBrowser",
+        "NWEndpoint",
+        "CFSocket",
+        "CFStream",
+        "CFReadStream",
+        "CFWriteStream",
+        "CFHTTPMessage",
+        "CFNetServiceBrowser",
+        "NetService",
+        "NetServiceBrowser",
+        "MCSession",
+        "MCNearbyServiceBrowser",
+        "WKWebView",
+        "WKWebViewConfiguration",
+        "WKNavigationDelegate",
+        "SFSafariViewController",
+        "ASWebAuthenticationSession",
+        "CocoaMQTT",
+        "CocoaMQTT5",
+        "OtlpHttpTraceExporter",
+        "OtlpHttpMetricExporter",
+        "OtlpHttpLogExporter",
+        "NSURLConnection"
+      ],
+      "sequences": [
+        "AsyncImage (",
+        "Data ( contentsOf",
+        "String ( contentsOf",
+        "NSData ( contentsOf",
+        "NSString ( contentsOf",
+        "UIImage ( contentsOf"
+      ],
+      "call_symbols": [
+        "socket",
+        "getaddrinfo",
+        "gethostbyname"
+      ]
+    },
+    {
+      "id": "persistence",
+      "category": "persistence",
+      "route": "Use the kernel preference/cache/credential APIs; durable business state belongs behind the backend.",
+      "symbols": [
+        "UserDefaults",
+        "FileManager",
+        "FileHandle",
+        "NSFileCoordinator",
+        "NSKeyedArchiver",
+        "NSKeyedUnarchiver",
+        "SecItemAdd",
+        "SecItemCopyMatching",
+        "SecItemUpdate",
+        "SecItemDelete",
+        "sqlite3_open",
+        "sqlite3_exec",
+        "NSPersistentContainer",
+        "ModelContainer",
+        "NSUbiquitousKeyValueStore",
+        "InputStream",
+        "OutputStream",
+        "NSTemporaryDirectory",
+        "CKContainer",
+        "AppStorage",
+        "SceneStorage"
+      ],
+      "sequences": [
+        ". write ( to",
+        ". write ( toFile",
+        ". write ( contentsOf",
+        "AppStorage (",
+        "createFile ( atPath",
+        "contentsOfFile :"
+      ],
+      "call_symbols": [
+        "fopen",
+        "fwrite",
+        "open",
+        "write",
+        "mkstemp",
+        "unlink",
+        "rename",
+        "mkdir",
+        "rmdir"
+      ]
+    },
+    {
+      "id": "logging",
+      "category": "logging",
+      "route": "Use the kernel observation API; do not create log files or OS log handlers in app code.",
+      "symbols": [
+        "Logger",
+        "OSLog",
+        "OSSignposter",
+        "os_signpost",
+        "MXMetricManager",
+        "OSLogStore",
+        "SwiftLogger"
+      ],
+      "sequences": [
+        "print (",
+        "dump (",
+        "FileHandle . standardError"
+      ],
+      "call_symbols": [
+        "fputs",
+        "setvbuf",
+        "freopen",
+        "os_log",
+        "NSLog",
+        "debugPrint"
+      ]
+    },
+    {
+      "id": "escape-routes",
+      "category": "escape",
+      "route": "Subprocess, dynamic-code and FFI routes are not allowed in app code.",
+      "symbols": [
+        "Process",
+        "NSTask",
+        "@_silgen_name",
+        "@_cdecl",
+        "@_dynamicReplacement",
+        "NSExpression",
+        "JSContext",
+        "JSVirtualMachine",
+        "NSAppleScript",
+        "XPCSession",
+        "NSXPCConnection"
+      ],
+      "call_symbols": [
+        "posix_spawn",
+        "posix_spawnp",
+        "dlopen",
+        "dlsym",
+        "dlclose",
+        "objc_getClass",
+        "objc_msgSend",
+        "popen",
+        "system",
+        "fork",
+        "execv",
+        "execve",
+        "execvp",
+        "NSClassFromString",
+        "NSSelectorFromString"
+      ]
+    }
+  ]
+}

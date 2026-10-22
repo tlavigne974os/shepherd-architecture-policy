@@ -1,0 +1,7 @@
+# The architecture boundary is owner-controlled (opd-6289 slice1, DESIGN-v3 "Protected architecture checks").
+# Inert until the repository owner enables required code-owner review on main; a Fleet approval is not an
+# owner approval.
+/tools/architecture-policy/                       @tlavigne974os
+/.github/workflows/architecture-check.yml         @tlavigne974os
+/.github/CODEOWNERS                               @tlavigne974os
+/Packages/BaxterMiddlewareKernel/                 @tlavigne974os

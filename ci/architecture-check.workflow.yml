@@ -1,0 +1,81 @@
+name: Architecture Check
+
+# Required status: architecture-check (opd-6289 slice1). The iPad app must not acquire hardware, open network
+# paths, write durable state or create log sinks except through BaxterMiddlewareKernel.
+#
+# pull_request_target on purpose: the workflow, the checker and the policy that run are the BASE branch's, so a
+# candidate cannot weaken them in the same change. The candidate is checked out as DATA: nothing in it is
+# imported, built, run, or expanded as shell here. Changes to the boundary itself (policy, checker, pin,
+# workflow, CODEOWNERS) fail the check by design; they go through the owner-approved policy release.
+
+on:
+  pull_request_target:
+    branches: [main]
+
+permissions:
+  contents: read
+  statuses: write
+
+concurrency:
+  group: architecture-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  architecture:
+    name: architecture-check
+    runs-on: [self-hosted, macOS, ARM64, geordi, baxter-ci, pr-ci]
+    steps:
+      - name: Trusted checker and policy (base branch)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: trusted
+          persist-credentials: false
+          sparse-checkout: |
+            tools/architecture-policy
+          sparse-checkout-cone-mode: true
+
+      - name: Candidate source (data only)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: candidate
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Changed files
+        id: changed
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git -C candidate diff --name-only "$BASE_SHA" "$HEAD_SHA" > "$RUNNER_TEMP/changed-files.txt"
+          wc -l < "$RUNNER_TEMP/changed-files.txt"
+
+      - name: Run the architecture check
+        id: check
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -uo pipefail
+          python3 -I trusted/tools/architecture-policy/arch_check.py \
+            --repo-root candidate \
+            --policy trusted/tools/architecture-policy/policy/ipad-app.policy.json \
+            --trusted-policy trusted/tools/architecture-policy/policy/ipad-app.policy.json \
+            --changed-files "$RUNNER_TEMP/changed-files.txt" | tee "$RUNNER_TEMP/architecture-report.txt"
+          echo "rc=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Report the result on the candidate head
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPO: ${{ github.repository }}
+          RC: ${{ steps.check.outputs.rc }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          if [ "${RC:-}" = "0" ]; then state=success; desc="no direct hardware, network, persistence or logging outside the kernel"; else state=failure; desc="architecture boundary violated or checker error (see run)"; fi
+          gh api "repos/$REPO/statuses/$HEAD_SHA" -f state="$state" -f context="architecture-check" \
+            -f description="$desc" -f target_url="$RUN_URL" >/dev/null
