@@ -2,24 +2,28 @@
   "version": 1,
   "comment": "Architecture boundary for the Baxter iPad app. App code must not acquire hardware, open network paths, write durable state or create log sinks itself; it uses the BaxterMiddlewareKernel operations. Edited only through an owner-approved policy release.",
   "app_zones": [
-    "Frame/**/*.swift"
+    "Frame/**"
   ],
   "linked_package_zones": [
-    "Packages/BaxterVoiceEngine/Sources/BaxterVoiceEngine/**",
-    "Packages/BaxterVoiceEngine/Sources/BaxterCaptureRing/**",
-    "Packages/BaxterVoiceEngine/Sources/BaxterRealtimeCapture/**",
-    "Packages/BaxterVoiceEngine/Sources/BaxterWakeRing/**",
-    "Packages/BaxterVoicePresentation/Sources/**"
+    "Packages/BaxterVoiceEngine/**",
+    "Packages/BaxterVoicePresentation/**",
+    "Packages/TensorFlowLiteSwift/**",
+    "Packages/TensorFlowLiteC/**"
   ],
   "kernel_zones": [
     "Packages/BaxterMiddlewareKernel/**"
   ],
-  "excluded": [],
+  "excluded": [
+    "**/.build/**",
+    "Packages/*/Tests/**",
+    "Frame/**/*.md"
+  ],
   "protected_paths": [
     "tools/architecture-policy/**",
     "tools/architecture-policy.pin",
     ".github/workflows/architecture-check.yml",
-    ".github/CODEOWNERS"
+    ".github/CODEOWNERS",
+    "Packages/BaxterMiddlewareKernel/**"
   ],
   "dependencies": {
     "app_targets": [
@@ -37,12 +41,36 @@
       "CocoaMQTT",
       "OpenTelemetryApi",
       "OpenTelemetrySdk",
-      "OpenTelemetryProtocolExporterHTTP",
-      "BaxterVoiceEngineSDK29"
+      "OpenTelemetryProtocolExporterHTTP"
     ],
     "route": "Add the capability to Packages/BaxterMiddlewareKernel and call the kernel operation; do not link an I/O library from the app."
   },
-  "allowed_sites": [],
+  "allowed_sites": [
+    {
+      "file": "Packages/TensorFlowLiteC/Package.swift",
+      "rule": "package-build-input",
+      "match": "binaryTarget",
+      "note": "vendored TensorFlow Lite C xcframework (Google binary); named in allowed_binary_artifacts"
+    },
+    {
+      "file": "Packages/BaxterVoiceEngine/Dependencies/TensorFlowLiteC/Package.swift",
+      "rule": "package-build-input",
+      "match": "binaryTarget",
+      "note": "second vendored copy of the same xcframework package"
+    },
+    {
+      "file": "Packages/TensorFlowLiteSwift/Sources/TensorFlowLite/tensorflow/lite/swift/Sources/Interpreter.swift",
+      "rule": "logging",
+      "match": "print (",
+      "note": "vendored TensorFlow Lite error-reporter callback (stdout only, no log sink)"
+    },
+    {
+      "file": "Packages/BaxterVoiceEngine/Dependencies/TensorFlowLiteSwift/Sources/TensorFlowLite/tensorflow/lite/swift/Sources/Interpreter.swift",
+      "rule": "logging",
+      "match": "print (",
+      "note": "second vendored copy of the same wrapper"
+    }
+  ],
   "rules": [
     {
       "id": "hardware-audio",
@@ -285,6 +313,50 @@
         "NSClassFromString",
         "NSSelectorFromString"
       ]
+    },
+    {
+      "id": "test-seam",
+      "category": "test seam",
+      "symbols": [
+        "debugStubbed",
+        "debugProtocolClasses",
+        "unscopedWriterForTests"
+      ],
+      "route": "These exist only in DEBUG builds of the kernel for XCTest and must never be named by shipped code: tests build their own stubbed session or seeded store."
+    },
+    {
+      "id": "package-build-input",
+      "category": "build input",
+      "symbols": [
+        "unsafeFlags",
+        "binaryTarget",
+        "systemLibrary"
+      ],
+      "sequences": [
+        ". plugin (",
+        "plugins :",
+        ". package ( url :"
+      ],
+      "route": "A package may not add unsafe compiler/linker flags, prebuilt binaries, build plugins, system libraries or remote dependencies on its own: they ship or run unscanned code. Name an exception exactly in allowed_sites through the owner-approved policy release."
+    }
+  ],
+  "project_file": "BaxterToo.xcodeproj/project.pbxproj",
+  "allowed_binary_artifacts": [
+    "Packages/TensorFlowLiteC/Frameworks/TensorFlowLiteC.xcframework",
+    "Packages/BaxterVoiceEngine/Dependencies/TensorFlowLiteC/Frameworks/TensorFlowLiteC.xcframework"
+  ],
+  "allowed_build_scripts": [
+    {
+      "sha256": "877138e33e1d524e161b91848c3e2563a9f6a9eae0d64e2b41e0f3a7d93feae8",
+      "note": "capture-build.json generator (writes the installed source identity into the bundle); targets: BaxterToo"
+    },
+    {
+      "sha256": "bbc9884cd419e0975280aebfdcb1d72784cd218d5577f567cd2e7b699de5b135",
+      "note": "bundled canary SVG hash verification (build-time check only); targets: BaxterToo, BaxterTooRestricted"
+    },
+    {
+      "sha256": "019600fa2e4ba22afc8d81ebb2f1719936877e7831d28d7554a6a8b05d2a1f5f",
+      "note": "capture-build.json generator (writes the installed source identity into the bundle); targets: BaxterTooRestricted"
     }
   ]
 }
